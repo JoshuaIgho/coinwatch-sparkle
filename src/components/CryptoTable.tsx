@@ -10,12 +10,13 @@ interface CryptoTableProps {
   coins: CryptoCoin[];
   isLoading: boolean;
   lastUpdated: Date | null;
+  onCoinClick: (coin: CryptoCoin) => void;
 }
 
 type SortField = 'market_cap_rank' | 'current_price' | 'price_change_percentage_24h' | 'market_cap' | 'name';
 type SortDirection = 'asc' | 'desc';
 
-const CryptoTable = ({ coins, isLoading, lastUpdated }: CryptoTableProps) => {
+const CryptoTable = ({ coins, isLoading, lastUpdated, onCoinClick }: CryptoTableProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('market_cap_rank');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -162,7 +163,8 @@ const CryptoTable = ({ coins, isLoading, lastUpdated }: CryptoTableProps) => {
                 return (
                   <tr 
                     key={coin.id} 
-                    className="border-b border-card-border hover:bg-secondary/50 transition-colors group"
+                    className="border-b border-card-border hover:bg-secondary/50 transition-colors group cursor-pointer"
+                    onClick={() => onCoinClick(coin)}
                   >
                     <td className="p-4">
                       <span className="text-muted-foreground font-medium">

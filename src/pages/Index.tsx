@@ -3,11 +3,16 @@ import { fetchTopCryptos, CryptoCoin } from '@/services/cryptoApi';
 import { useToast } from '@/hooks/use-toast';
 import CryptoVueHeader from '@/components/CryptoVueHeader';
 import CryptoTable from '@/components/CryptoTable';
+import RefreshIntervalSelector from '@/components/RefreshIntervalSelector';
+import CoinDetailModal from '@/components/CoinDetailModal';
 
 const Index = () => {
   const [coins, setCoins] = useState<CryptoCoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState(60); // Default 60 seconds
+  const [selectedCoin, setSelectedCoin] = useState<CryptoCoin | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
 
   const loadCryptoData = async (showToast = false) => {
@@ -35,26 +40,46 @@ const Index = () => {
     }
   };
 
+  const handleCoinClick = (coin: CryptoCoin) => {
+    setSelectedCoin(coin);
+    setIsModalOpen(true);
+  };
+
   useEffect(() => {
     // Initial load
     loadCryptoData();
 
-    // Set up auto-refresh every 60 seconds
+    // Set up auto-refresh with selected interval
     const interval = setInterval(() => {
       loadCryptoData(true);
-    }, 60000);
+    }, refreshInterval * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshInterval]);
 
   return (
     <div className="min-h-screen bg-gradient-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <CryptoVueHeader />
+        
+        <div className="mb-6">
+          <RefreshIntervalSelector
+            selectedInterval={refreshInterval}
+            onIntervalChange={setRefreshInterval}
+          />
+        </div>
+
         <CryptoTable 
           coins={coins} 
           isLoading={isLoading} 
           lastUpdated={lastUpdated}
+          onCoinClick={handleCoinClick}
+        />
+
+        <CoinDetailModal
+          coin={selectedCoin}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
         />
       </div>
     </div>
