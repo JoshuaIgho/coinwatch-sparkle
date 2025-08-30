@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { fetchTopCryptos, CryptoCoin } from '@/services/cryptoApi';
+import { fetchTopCryptos, fetchSingleCoin, CryptoCoin } from '@/services/cryptoApi';
 import { useToast } from '@/hooks/use-toast';
 import CryptoVueHeader from '@/components/CryptoVueHeader';
 import CryptoTable from '@/components/CryptoTable';
 import RefreshIntervalSelector from '@/components/RefreshIntervalSelector';
 import CoinDetailModal from '@/components/CoinDetailModal';
+import Navigation from '@/components/Navigation';
 
 const Index = () => {
   const [coins, setCoins] = useState<CryptoCoin[]>([]);
@@ -45,6 +46,10 @@ const Index = () => {
     setIsModalOpen(true);
   };
 
+  const handleRefreshCoin = async (coinId: string): Promise<CryptoCoin> => {
+    return await fetchSingleCoin(coinId);
+  };
+
   useEffect(() => {
     // Initial load
     loadCryptoData();
@@ -59,6 +64,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-background">
+      <Navigation currentView="main" />
+      
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <CryptoVueHeader />
         
@@ -80,6 +87,7 @@ const Index = () => {
           coin={selectedCoin}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
+          onRefreshCoin={handleRefreshCoin}
         />
       </div>
     </div>

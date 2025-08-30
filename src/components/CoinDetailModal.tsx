@@ -5,20 +5,45 @@ import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, RotateCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { CryptoCoin, formatPrice, formatMarketCap, formatPercentageChange } from '@/services/cryptoApi';
+import Navigation from './Navigation';
+import RefreshIntervalSelector from './RefreshIntervalSelector';
 
 interface CoinDetailModalProps {
   coin: CryptoCoin | null;
   isOpen: boolean;
   onClose: () => void;
+  onRefreshCoin?: (coinId: string) => Promise<CryptoCoin>;
 }
 
-const CoinDetailModal = ({ coin, isOpen, onClose }: CoinDetailModalProps) => {
+const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailModalProps) => {
   const [chartData, setChartData] = useState<Array<{ time: string; price: number }>>([]);
+  const [refreshInterval, setRefreshInterval] = useState(300); // Default 5 minutes
+  const [currentCoin, setCurrentCoin] = useState<CryptoCoin | null>(coin);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const refreshCoinData = async () => {
+    if (!currentCoin?.id || !onRefreshCoin) return;
+    
+    setIsRefreshing(true);
+    try {
+      const updatedCoin = await onRefreshCoin(currentCoin.id);
+      setCurrentCoin(updatedCoin);
+    } catch (error) {
+      console.error('Failed to refresh coin data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    if (coin?.sparkline_in_7d?.price) {
+    setCurrentCoin(coin);
+  }, [coin]);
+
+  useEffect(() => {
+    const activeCoin = currentCoin || coin;
+    if (activeCoin?.sparkline_in_7d?.price) {
       // Convert sparkline data to chart format with time labels
-      const data = coin.sparkline_in_7d.price.map((price, index) => {
+      const data = activeCoin.sparkline_in_7d.price.map((price, index) => {
         const date = new Date();
         date.setHours(date.getHours() - (168 - index)); // 168 hours in 7 days
         return {
@@ -28,32 +53,60 @@ const CoinDetailModal = ({ coin, isOpen, onClose }: CoinDetailModalProps) => {
       });
       setChartData(data);
     }
-  }, [coin]);
+  }, [coin, currentCoin]);
 
-  if (!coin) return null;
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!isOpen || !onRefreshCoin) return;
 
-  const isPositive24h = coin.price_change_percentage_24h >= 0;
-  const is7dPositive = coin.sparkline_in_7d?.price ? 
-    coin.sparkline_in_7d.price[coin.sparkline_in_7d.price.length - 1] >= coin.sparkline_in_7d.price[0] : true;
+    const interval = setInterval(() => {
+      refreshCoinData();
+    }, refreshInterval * 1000);
+
+    return () => clearInterval(interval);
+  }, [isOpen, refreshInterval, currentCoin?.id, onRefreshCoin]);
+
+  const displayCoin = currentCoin || coin;
+  if (!displayCoin) return null;
+
+  const isPositive24h = displayCoin.price_change_percentage_24h >= 0;
+  const is7dPositive = displayCoin.sparkline_in_7d?.price ? 
+    displayCoin.sparkline_in_7d.price[displayCoin.sparkline_in_7d.price.length - 1] >= displayCoin.sparkline_in_7d.price[0] : true;
 
   const strokeColor = is7dPositive ? 'hsl(var(--success))' : 'hsl(var(--destructive))';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl bg-card border-card-border">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <img 
-              src={coin.image} 
-              alt={coin.name}
-              className="w-8 h-8 rounded-full"
-            />
-            <div>
-              <span className="text-xl font-bold">{coin.name}</span>
-              <span className="text-muted-foreground ml-2 text-sm uppercase">
-                {coin.symbol}
-              </span>
+        <Navigation 
+          currentView="detail" 
+          onNavigateHome={onClose} 
+          coinName={displayCoin.name}
+        />
+        
+        <DialogHeader className="mt-4">
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img 
+                src={displayCoin.image} 
+                alt={displayCoin.name}
+                className="w-8 h-8 rounded-full"
+              />
+              <div>
+                <span className="text-xl font-bold">{displayCoin.name}</span>
+                <span className="text-muted-foreground ml-2 text-sm uppercase">
+                  {displayCoin.symbol}
+                </span>
+                {isRefreshing && (
+                  <RotateCcw className="w-4 h-4 ml-2 animate-spin inline text-primary" />
+                )}
+              </div>
             </div>
+            
+            <RefreshIntervalSelector
+              selectedInterval={refreshInterval}
+              onIntervalChange={setRefreshInterval}
+            />
           </DialogTitle>
         </DialogHeader>
 
@@ -63,7 +116,7 @@ const CoinDetailModal = ({ coin, isOpen, onClose }: CoinDetailModalProps) => {
             <Card className="p-4 bg-secondary/20 border-card-border">
               <div className="text-sm text-muted-foreground mb-1">Current Price</div>
               <div className="text-2xl font-bold text-foreground">
-                {formatPrice(coin.current_price)}
+                {formatPrice(displayCoin.current_price)}
               </div>
             </Card>
 
@@ -85,7 +138,7 @@ const CoinDetailModal = ({ coin, isOpen, onClose }: CoinDetailModalProps) => {
                   ) : (
                     <TrendingDown className="w-4 h-4" />
                   )}
-                  {formatPercentageChange(coin.price_change_percentage_24h)}
+                  {formatPercentageChange(displayCoin.price_change_percentage_24h)}
                 </div>
               </Badge>
             </Card>
@@ -93,10 +146,10 @@ const CoinDetailModal = ({ coin, isOpen, onClose }: CoinDetailModalProps) => {
             <Card className="p-4 bg-secondary/20 border-card-border">
               <div className="text-sm text-muted-foreground mb-1">Market Cap</div>
               <div className="text-xl font-bold text-foreground">
-                {formatMarketCap(coin.market_cap)}
+                {formatMarketCap(displayCoin.market_cap)}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                Rank #{coin.market_cap_rank}
+                Rank #{displayCoin.market_cap_rank}
               </div>
             </Card>
           </div>

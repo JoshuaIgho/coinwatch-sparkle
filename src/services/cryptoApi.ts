@@ -44,6 +44,23 @@ export const fetchTopCryptos = async (limit: number = 50): Promise<CryptoCoin[]>
   }
 };
 
+export const fetchSingleCoin = async (coinId: string): Promise<CryptoCoin> => {
+  try {
+    const response = await cryptoApi.get('/coins/markets', {
+      params: {
+        vs_currency: 'usd',
+        ids: coinId,
+        sparkline: true,
+        price_change_percentage: '24h,7d'
+      }
+    });
+    return response.data[0];
+  } catch (error) {
+    console.error('Error fetching single coin data:', error);
+    throw new Error('Failed to fetch coin data');
+  }
+};
+
 export const formatPrice = (price: number): string => {
   if (price < 0.01) {
     return `$${price.toFixed(6)}`;
