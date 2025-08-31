@@ -47,23 +47,30 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
     if (!activeCoin?.id) return;
     
     setIsLoadingChart(true);
+    
+    // Always use sparkline data as it's already available and reliable
+    if (activeCoin.sparkline_in_7d?.price) {
+      const sparklineData = activeCoin.sparkline_in_7d.price.map((price, index) => {
+        const date = new Date();
+        date.setHours(date.getHours() - (168 - index));
+        return {
+          time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          price: price,
+        };
+      });
+      setChartData(sparklineData);
+      setIsLoadingChart(false);
+      return;
+    }
+    
+    // If no sparkline data, try API call as fallback
     try {
       const data = await fetchCoinChartData(activeCoin.id, chartDuration);
       setChartData(data);
     } catch (error) {
       console.error('Failed to load chart data:', error);
-      // Fallback to sparkline data for 7-day period
-      if (chartDuration === '7' && activeCoin.sparkline_in_7d?.price) {
-        const fallbackData = activeCoin.sparkline_in_7d.price.map((price, index) => {
-          const date = new Date();
-          date.setHours(date.getHours() - (168 - index));
-          return {
-            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            price: price,
-          };
-        });
-        setChartData(fallbackData);
-      }
+      // Show empty chart if all methods fail
+      setChartData([]);
     } finally {
       setIsLoadingChart(false);
     }
