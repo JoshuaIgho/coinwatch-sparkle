@@ -61,6 +61,31 @@ export const fetchSingleCoin = async (coinId: string): Promise<CryptoCoin> => {
   }
 };
 
+export const fetchCoinChartData = async (coinId: string, days: string): Promise<Array<{ time: string; price: number }>> => {
+  try {
+    const response = await cryptoApi.get(`/coins/${coinId}/market_chart`, {
+      params: {
+        vs_currency: 'usd',
+        days: days,
+        interval: days === '1' ? 'hourly' : 'daily'
+      }
+    });
+    
+    return response.data.prices.map(([timestamp, price]: [number, number]) => {
+      const date = new Date(timestamp);
+      return {
+        time: days === '1' 
+          ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        price: price,
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching chart data:', error);
+    throw new Error('Failed to fetch chart data');
+  }
+};
+
 export const formatPrice = (price: number): string => {
   if (price < 0.01) {
     return `$${price.toFixed(6)}`;

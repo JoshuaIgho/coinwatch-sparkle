@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, RotateCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { CryptoCoin, formatPrice, formatMarketCap, formatPercentageChange } from '@/services/cryptoApi';
+import { CryptoCoin, formatPrice, formatMarketCap, formatPercentageChange, fetchCoinChartData } from '@/services/cryptoApi';
 import Navigation from './Navigation';
 import RefreshIntervalSelector from './RefreshIntervalSelector';
+import ChartDurationSelector, { ChartDuration } from './ChartDurationSelector';
 
 interface CoinDetailModalProps {
   coin: CryptoCoin | null;
@@ -20,6 +21,8 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
   const [refreshInterval, setRefreshInterval] = useState(300); // Default 5 minutes
   const [currentCoin, setCurrentCoin] = useState<CryptoCoin | null>(coin);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [chartDuration, setChartDuration] = useState<ChartDuration>('7');
+  const [isLoadingChart, setIsLoadingChart] = useState(false);
 
   const refreshCoinData = async () => {
     if (!currentCoin?.id || !onRefreshCoin) return;
@@ -39,21 +42,38 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
     setCurrentCoin(coin);
   }, [coin]);
 
-  useEffect(() => {
+  const loadChartData = async () => {
     const activeCoin = currentCoin || coin;
-    if (activeCoin?.sparkline_in_7d?.price) {
-      // Convert sparkline data to chart format with time labels
-      const data = activeCoin.sparkline_in_7d.price.map((price, index) => {
-        const date = new Date();
-        date.setHours(date.getHours() - (168 - index)); // 168 hours in 7 days
-        return {
-          time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          price: price,
-        };
-      });
+    if (!activeCoin?.id) return;
+    
+    setIsLoadingChart(true);
+    try {
+      const data = await fetchCoinChartData(activeCoin.id, chartDuration);
       setChartData(data);
+    } catch (error) {
+      console.error('Failed to load chart data:', error);
+      // Fallback to sparkline data for 7-day period
+      if (chartDuration === '7' && activeCoin.sparkline_in_7d?.price) {
+        const fallbackData = activeCoin.sparkline_in_7d.price.map((price, index) => {
+          const date = new Date();
+          date.setHours(date.getHours() - (168 - index));
+          return {
+            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: price,
+          };
+        });
+        setChartData(fallbackData);
+      }
+    } finally {
+      setIsLoadingChart(false);
     }
-  }, [coin, currentCoin]);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadChartData();
+    }
+  }, [coin, currentCoin, chartDuration, isOpen]);
 
   // Auto-refresh effect
   useEffect(() => {
@@ -155,28 +175,47 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
           </div>
 
           {/* Price Chart */}
-          <Card className="p-6 bg-secondary/20 border-card-border">
-            <div className="flex items-center gap-2 mb-4">
-              <RotateCcw className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">7-Day Price Chart</h3>
+          <Card className="p-4 md:p-6 bg-secondary/20 border-card-border">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">Price Chart</h3>
+              </div>
+              <ChartDurationSelector
+                selectedDuration={chartDuration}
+                onDurationChange={setChartDuration}
+              />
             </div>
             
-            {chartData.length > 0 ? (
-              <div className="h-80">
+            {isLoadingChart ? (
+              <div className="h-80 flex items-center justify-center">
+                <div className="flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-muted-foreground">Loading chart data...</span>
+                </div>
+              </div>
+            ) : chartData.length > 0 ? (
+              <div className="h-64 md:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
                     <XAxis 
                       dataKey="time" 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      interval="preserveStartEnd"
                     />
                     <YAxis 
                       domain={['dataMin', 'dataMax']}
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                      tickFormatter={(value) => `$${value.toFixed(2)}`}
+                      tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      tickFormatter={(value) => {
+                        if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
+                        if (value >= 1) return `$${value.toFixed(2)}`;
+                        return `$${value.toFixed(4)}`;
+                      }}
+                      width={60}
                     />
                     <Tooltip
                       contentStyle={{
@@ -184,8 +223,9 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
                         border: '1px solid hsl(var(--card-border))',
                         borderRadius: '8px',
                         color: 'hsl(var(--foreground))',
+                        fontSize: '12px',
                       }}
-                      formatter={(value: number) => [`$${value.toFixed(4)}`, 'Price']}
+                      formatter={(value: number) => [formatPrice(value), 'Price']}
                       labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                     />
                     <Line
