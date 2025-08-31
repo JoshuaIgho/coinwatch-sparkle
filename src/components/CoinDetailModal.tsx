@@ -77,7 +77,7 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-card border-card-border">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-card-border">
         <Navigation 
           currentView="detail" 
           onNavigateHome={onClose} 
