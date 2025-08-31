@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export type ChartDuration = '1' | '7' | '30' | '90' | '365';
+export type ChartDuration = '7' | '30' | '90' | '365';
 
 interface ChartDurationSelectorProps {
   selectedDuration: ChartDuration;
@@ -8,7 +8,6 @@ interface ChartDurationSelectorProps {
 }
 
 const durationOptions = [
-  { value: '1' as ChartDuration, label: '1 Day' },
   { value: '7' as ChartDuration, label: '7 Days' },
   { value: '30' as ChartDuration, label: '30 Days' },
   { value: '90' as ChartDuration, label: '90 Days' },

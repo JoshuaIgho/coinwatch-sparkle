@@ -48,29 +48,42 @@ const CoinDetailModal = ({ coin, isOpen, onClose, onRefreshCoin }: CoinDetailMod
     
     setIsLoadingChart(true);
     
-    // Always use sparkline data as it's already available and reliable
-    if (activeCoin.sparkline_in_7d?.price) {
-      const sparklineData = activeCoin.sparkline_in_7d.price.map((price, index) => {
-        const date = new Date();
-        date.setHours(date.getHours() - (168 - index));
-        return {
-          time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          price: price,
-        };
-      });
-      setChartData(sparklineData);
-      setIsLoadingChart(false);
-      return;
-    }
-    
-    // If no sparkline data, try API call as fallback
     try {
+      // For 7-day period, use the reliable sparkline data
+      if (chartDuration === '7' && activeCoin.sparkline_in_7d?.price) {
+        const sparklineData = activeCoin.sparkline_in_7d.price.map((price, index) => {
+          const date = new Date();
+          date.setHours(date.getHours() - (168 - index));
+          return {
+            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: price,
+          };
+        });
+        setChartData(sparklineData);
+        setIsLoadingChart(false);
+        return;
+      }
+      
+      // For other periods, try the API call
       const data = await fetchCoinChartData(activeCoin.id, chartDuration);
       setChartData(data);
     } catch (error) {
       console.error('Failed to load chart data:', error);
-      // Show empty chart if all methods fail
-      setChartData([]);
+      
+      // If API fails, fall back to sparkline for any period
+      if (activeCoin.sparkline_in_7d?.price) {
+        const sparklineData = activeCoin.sparkline_in_7d.price.map((price, index) => {
+          const date = new Date();
+          date.setHours(date.getHours() - (168 - index));
+          return {
+            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: price,
+          };
+        });
+        setChartData(sparklineData);
+      } else {
+        setChartData([]);
+      }
     } finally {
       setIsLoadingChart(false);
     }
