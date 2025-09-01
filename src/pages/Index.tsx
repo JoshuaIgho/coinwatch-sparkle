@@ -18,8 +18,10 @@ const Index = () => {
 
   const loadCryptoData = async (showToast = false) => {
     try {
+      console.log('Loading crypto data...');
       setIsLoading(true);
       const data = await fetchTopCryptos(50);
+      console.log('Fetched crypto data:', data.length, 'coins');
       setCoins(data);
       setLastUpdated(new Date());
       
